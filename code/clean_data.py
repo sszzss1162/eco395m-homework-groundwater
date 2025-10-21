@@ -1,59 +1,68 @@
+import requests
 import datetime
+import json
 
 
 def extract_timeseriesx(raw_data):
-    """Returns a list of all timeseries (as dict),
-    given the raw data as dict."""
+    """Extracts a list of timeseries from the raw data dict."""
+    return raw_data["value"]["timeSeries"]
 
-    return
 
 def extract_metadata_from_timeseries(timeseries):
-    """Takes a single timeseries as dict and extracts the metadata as a dict
-    with the keys "site_name", "latitude", "longitude" and "variable_name".
-    The values for "latitude" and "longitude" are floats."""
+    """Extracts metadata from a timeseries dict."""
+    site_name = timeseries["sourceInfo"]["siteName"]
+    latitude = timeseries["sourceInfo"]["geoLocation"]["geogLocation"]["latitude"]
+    longitude = timeseries["sourceInfo"]["geoLocation"]["geogLocation"]["longitude"]
+    variable_name = timeseries["variable"]["variableName"]
 
-    return
+    return {
+        "site_name": site_name,
+        "latitude": float(latitude),
+        "longitude": float(longitude),
+        "variable_name": variable_name
+    }
 
 
 def extract_values_from_timerseries(timeseries):
-    """Takes a single timeseries as dict and extracts the values as a list of dictionaries
-    with keys "datetime" and "value".
-    The "datetime" values should be of type datetime.datetime.
-    The "value" value should be a float.
-    """
-
-    # note: timeseries["values"] is a list.
-    # Its unclear why its a list,
-    # because each element of it has a "value" key with a list as its values.
-    # So, it can already accommodate multiple values.
-    # Also, from spot checking timeseries["values"] appears to be of length 1.
-    # So, use only the first element of the list.
+    """Extracts the values from a timeseries dict."""
     values = timeseries["values"][0]["value"]
 
-    return
+    result = []
+    for value_entry in values:
+        value = float(value_entry["value"])
+        dt_str = value_entry["dateTime"]
+        dt_str = dt_str[:-1] + "000" if dt_str.endswith(".000") else dt_str
+        dt = datetime.datetime.strptime(dt_str, "%Y-%m-%dT%H:%M:%S.%f")
+        result.append({"value": value, "datetime": dt})
+
+    return result
 
 
 def extract_data_from_timeseries(timeseries):
-    """Extracts all of the data from a timeseries
-    by taking each row (a dict) of the values (values is a list of dicts)
-    and adding the metadata (a dict).
-    Returns a list of dicts."""
-
+    """Combines metadata and values into a list of dicts."""
     metadata = extract_metadata_from_timeseries(timeseries)
     values = extract_values_from_timerseries(timeseries)
 
-    return
+    result = []
+    for value_entry in values:
+        merged_entry = {**metadata, **value_entry}
+        result.append(merged_entry)
+
+    return result
 
 
 def extract_data(data):
-
     timeseriesx = extract_timeseriesx(data)
 
-    return
+    result = []
+    for timeseries in timeseriesx:
+        extracted_data = extract_data_from_timeseries(timeseries)
+        result.extend(extracted_data)
+
+    return result
 
 
 if __name__ == "__main__":
-
     example_timeseries = {
         "sourceInfo": {
             "siteName": "KH-65-40-707 (Galveston)",
